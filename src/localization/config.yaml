@@ -1,0 +1,34 @@
+camera:
+  serial: null  # set to your D435i serial or leave null for default
+  fps: 30
+  width: 640
+  height: 480
+  enable_color: true
+  enable_imu: true
+
+vision:
+  aruco_dict: DICT_4X4_1000
+  marker_length_m: 0.08  # 8 cm tag side length
+  # Manual intrinsics for D435i at 640x480 (fallback since auto-intrinsics not working)
+  camera_matrix: [[615.0, 0.0, 320.0], [0.0, 615.0, 240.0], [0.0, 0.0, 1.0]]
+  dist_coeffs: [0.0, 0.0, 0.0, 0.0, 0.0]
+  # Multi-marker world positions (x, y, z in meters)
+  marker_positions:
+    0: [-0.5, 0.0, -0.5]  # bottom-left (swapped Y and Z)
+    1: [0.5, 0.0, -0.5]   # bottom-right (swapped Y and Z)
+    2: [-0.5, 0.0, 0.5]   # top-left (swapped Y and Z)
+    3: [0.5, 0.0, 0.5]    # top-right (swapped Y and Z)
+
+fusion:
+  odometry_weight: 0.0  # No odometry in vision-only mode
+  vision_position_weight: 1.0  # Use 100% ArUco correction
+  vision_orientation_weight: 1.0  # Use 100% ArUco orientation
+  drift_vision_boost: 0.25
+  vision_position_frame: camera_in_world
+
+runtime:
+  visualize: true
+  log_poses: true
+  max_runtime_s: null
+  use_vision: true 
+  use_synthetic_odometry: true  # use built-in cross-pattern odometry in main.py
