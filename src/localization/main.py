@@ -148,8 +148,8 @@ def main():
                 stream.update_odometry(pos, ori, ts)
                 odom_idx += 1
             
-            # Read from stream
-            frame, odometry = stream.read()
+            # Read from stream (block until new frame to avoid busy waiting)
+            frame, odometry = stream.read_next(timeout=1.0)
             
             # Vision processing with multi-marker fusion
             vision_pose = None
@@ -278,8 +278,7 @@ def main():
                 if key == 27:
                     break
             
-            # Control timing
-            time.sleep(1.0 / 30.0)  # ~30 FPS
+            # No busy wait or sleeps; loop is paced by new frames
             
     except KeyboardInterrupt:
         print("\nTest interrupted by user")

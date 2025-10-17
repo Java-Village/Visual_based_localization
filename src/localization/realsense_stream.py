@@ -40,8 +40,10 @@ class RealSenseStream:
 		self._color_frame = None
 		self._odometry: Optional[Dict[str, Any]] = None
 		self._lock = threading.Lock()
+		self._cv = threading.Condition(self._lock)
 		self._running = False
 		self._t0: Optional[float] = None  # normalize timestamps to start at 0
+		self._frame_seq: int = 0  # monotonically increasing on new color frame
 
 	def start(self) -> None:
 		"""Start streaming from device with configured streams."""
@@ -94,7 +96,9 @@ class RealSenseStream:
 						# Color frames
 						if self.enable_color and f.profile.stream_type() == rs.stream.color:
 							self._color_frame = f.get_data()
-					# IMU streams removed - OpenVINS provides odometry
+							self._frame_seq += 1
+							self._cv.notify_all()
+						# IMU streams removed - OpenVINS provides odometry
 
 		self._thread = threading.Thread(target=_loop, daemon=True)
 		self._thread.start()
@@ -120,6 +124,28 @@ class RealSenseStream:
 				color = np.asanyarray(self._color_frame)
 			odometry = self._odometry.copy() if self._odometry is not None else None
 		return color, odometry
+
+	def read_next(self, timeout: Optional[float] = None) -> Tuple[Optional["np.ndarray"], Optional[Dict[str, Any]]]:
+		"""Block until a new color frame is available or timeout.
+
+		Returns the latest (color_bgr, odometry). If timeout elapses, returns current latest values.
+		"""
+		end_time = None if timeout is None else (time.time() + timeout)
+		with self._lock:
+			start_seq = self._frame_seq
+			# If we already have a frame, wait only if no new frame arrives
+			while self._running and self._frame_seq == start_seq:
+				remaining = None if end_time is None else max(0.0, end_time - time.time())
+				if remaining is not None and remaining == 0.0:
+					break
+				self._cv.wait(timeout=remaining)
+			# Prepare return values
+			color = None
+			if self._color_frame is not None:
+				import numpy as np  # local import
+				color = np.asanyarray(self._color_frame)
+			odometry = self._odometry.copy() if self._odometry is not None else None
+			return color, odometry
 
 	def get_color_intrinsics(self) -> Tuple[Optional["np.ndarray"], Optional["np.ndarray"]]:
 		"""Return (camera_matrix, dist_coeffs) from active color stream, if available."""
